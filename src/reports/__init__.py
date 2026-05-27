@@ -1,0 +1,1 @@
+"""Research-note generation."""

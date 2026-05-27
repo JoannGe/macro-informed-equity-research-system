@@ -1,0 +1,16 @@
+pandas>=2.1
+numpy>=1.26
+scipy>=1.11
+statsmodels>=0.14
+matplotlib>=3.8
+plotly>=5.18
+streamlit>=1.31
+pyyaml>=6.0
+requests>=2.31
+python-dotenv>=1.0
+pytest>=8.0
+
+# Optional A-share data connectors for live/research mode.
+# The app falls back to local CSV files or generated demo data when these fail.
+akshare>=1.13
+baostock>=0.8
