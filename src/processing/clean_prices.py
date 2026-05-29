@@ -5,18 +5,22 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from src.processing.standardize_schema import standardize_prices
 from src.utils.validation_utils import coerce_dates, require_columns
 
 
 def clean_prices(prices: pd.DataFrame) -> pd.DataFrame:
     """Validate and sort daily price observations."""
 
-    require_columns(prices, ["date", "stock_code", "close", "turnover"], "prices")
+    prices = standardize_prices(prices)
+    require_columns(prices, ["date", "ticker", "close", "amount"], "prices")
     result = coerce_dates(prices, ["date"]).copy()
-    result = result.sort_values(["stock_code", "date"])
+    result = result.sort_values(["ticker", "date"])
     result["close"] = pd.to_numeric(result["close"], errors="coerce")
-    result["turnover"] = pd.to_numeric(result["turnover"], errors="coerce")
-    return result.dropna(subset=["date", "stock_code", "close"])
+    result["amount"] = pd.to_numeric(result["amount"], errors="coerce")
+    result["stock_code"] = result["ticker"]
+    result["turnover"] = result["amount"]
+    return result.dropna(subset=["date", "ticker", "close"])
 
 
 def get_rebalance_dates(prices: pd.DataFrame, frequency: str = "Q") -> list[pd.Timestamp]:
@@ -39,13 +43,14 @@ def build_market_features(prices: pd.DataFrame, rebalance_dates: list[pd.Timesta
 
     cleaned = clean_prices(prices)
     frames: list[pd.DataFrame] = []
-    for stock_code, group in cleaned.groupby("stock_code", sort=False):
+    for stock_code, group in cleaned.groupby("ticker", sort=False):
         stock = group.sort_values("date").copy()
         stock["daily_return"] = stock["close"].pct_change()
         stock["momentum_6m"] = stock["close"].div(stock["close"].shift(126)).sub(1)
         stock["momentum_12m_ex_1m"] = stock["close"].shift(21).div(stock["close"].shift(252)).sub(1)
         stock["volatility"] = stock["daily_return"].rolling(126, min_periods=60).std() * np.sqrt(252)
-        stock["avg_turnover"] = stock["turnover"].rolling(63, min_periods=20).mean()
+        stock["avg_turnover"] = stock["amount"].rolling(63, min_periods=20).mean()
+        stock["max_drawdown_6m"] = stock["close"].div(stock["close"].rolling(126, min_periods=60).max()).sub(1)
         stock["stock_code"] = stock_code
         frames.append(stock)
 
@@ -61,12 +66,14 @@ def build_market_features(prices: pd.DataFrame, rebalance_dates: list[pd.Timesta
                 [
                     "as_of_date",
                     "stock_code",
+                    "ticker",
                     "date",
                     "close",
                     "momentum_6m",
                     "momentum_12m_ex_1m",
                     "volatility",
                     "avg_turnover",
+                    "max_drawdown_6m",
                 ]
             ].rename(columns={"date": "price_observation_date"})
         )

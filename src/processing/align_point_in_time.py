@@ -33,4 +33,6 @@ def build_rebalance_panel(
     )
     panel["data_is_point_in_time"] = panel["announcement_date"].le(panel["as_of_date"])
     panel.loc[panel["announcement_date"].isna(), "data_is_point_in_time"] = False
+    panel["ticker"] = panel["stock_code"]
+    panel = panel.drop(columns=[column for column in ["ticker_x", "ticker_y"] if column in panel.columns])
     return panel.sort_values(["as_of_date", "stock_code"]).reset_index(drop=True)

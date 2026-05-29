@@ -5,14 +5,16 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from src.processing.standardize_schema import standardize_fundamentals
 from src.utils.validation_utils import coerce_dates, require_columns
 
 
 def clean_fundamentals(fundamentals: pd.DataFrame, reporting_lag_days: int) -> pd.DataFrame:
     """Validate fundamentals and create announcement dates when missing."""
 
-    require_columns(fundamentals, ["stock_code", "report_date"], "fundamentals")
-    result = coerce_dates(fundamentals, ["report_date", "announcement_date"]).copy()
+    result = standardize_fundamentals(fundamentals, reporting_lag_days)
+    require_columns(result, ["stock_code", "report_date"], "fundamentals")
+    result = coerce_dates(result, ["report_date", "announcement_date", "date"]).copy()
     if "announcement_date" not in result.columns:
         result["announcement_date"] = result["report_date"] + pd.to_timedelta(reporting_lag_days, unit="D")
     result = result.sort_values(["stock_code", "report_date"])
@@ -36,6 +38,8 @@ def build_fundamental_features(fundamentals: pd.DataFrame, reporting_lag_days: i
         "current_assets",
         "current_liabilities",
         "capex",
+        "asset_growth",
+        "capex_growth",
         "pe",
         "pb",
         "ps",
@@ -62,11 +66,15 @@ def build_fundamental_features(fundamentals: pd.DataFrame, reporting_lag_days: i
         ("revenue", "revenue_growth"),
         ("net_profit", "net_profit_growth"),
         ("operating_cash_flow", "operating_cash_flow_growth"),
+        ("total_assets", "asset_growth"),
+        ("capex", "capex_growth"),
     ]:
-        if column in result.columns:
+        if column in result.columns and (new_column not in result.columns or result[new_column].isna().all()):
             result[new_column] = result.groupby("stock_code")[column].pct_change(4)
-        else:
+        elif new_column not in result.columns:
             result[new_column] = np.nan
+    if "profit_growth" not in result.columns or result["profit_growth"].isna().all():
+        result["profit_growth"] = result.get("net_profit_growth", np.nan)
     return result
 
 

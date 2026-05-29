@@ -14,7 +14,7 @@ def score_stocks(
     industry_scores: pd.DataFrame,
     config: dict[str, Any],
 ) -> pd.DataFrame:
-    """Combine macro-industry and firm factor scores into a total score."""
+    """Combine accepted factor-investing scores into a composite screen."""
 
     weights = config.get("scoring_weights", {})
     result = factor_scores.merge(
@@ -24,21 +24,27 @@ def score_stocks(
     )
     for column in [
         "industry_score",
+        "value_score",
+        "investment_score",
+        "low_volatility_score",
+        "liquidity_score",
+        "risk_penalty_score",
         "quality_score",
-        "growth_score",
-        "valuation_score",
         "momentum_score",
-        "risk_score",
     ]:
+        if column not in result.columns:
+            result[column] = 0.0
         result[column] = result[column].fillna(0.0)
 
     result["total_score"] = (
-        float(weights.get("w_macro_industry", 0.20)) * result["industry_score"]
+        float(weights.get("w_value", 0.20)) * result["value_score"]
+        + float(weights.get("w_momentum", 0.20)) * result["momentum_score"]
         + float(weights.get("w_quality", 0.20)) * result["quality_score"]
-        + float(weights.get("w_growth", 0.15)) * result["growth_score"]
-        + float(weights.get("w_valuation", 0.15)) * result["valuation_score"]
-        + float(weights.get("w_momentum", 0.15)) * result["momentum_score"]
-        - float(weights.get("w_risk", 0.15)) * result["risk_score"]
+        + float(weights.get("w_investment", 0.10)) * result["investment_score"]
+        + float(weights.get("w_low_volatility", 0.10)) * result["low_volatility_score"]
+        + float(weights.get("w_liquidity", 0.05)) * result["liquidity_score"]
+        + float(weights.get("w_industry", 0.10)) * result["industry_score"]
+        - float(weights.get("w_risk_penalty", 0.15)) * result["risk_penalty_score"]
     )
     result = apply_risk_filters(result, config)
     return result.sort_values(["as_of_date", "total_score"], ascending=[True, False]).reset_index(drop=True)
