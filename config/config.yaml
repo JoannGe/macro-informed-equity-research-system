@@ -1,0 +1,62 @@
+project:
+  name: "Macro-Informed Equity Research Platform"
+  market: "A-shares"
+  benchmark_code: "399673"
+  benchmark_name: "ChiNext 50 Index"
+  research_only_notice: "Educational screening and paper-research tool only. Not financial advice and not an order-execution system."
+
+data:
+  demo_seed: 42
+  reporting_lag_days: 75
+  start_date: "2020-01-01"
+  end_date: "2025-12-31"
+  processed_dir: "data/processed"
+  demo_dir: "data/demo"
+  raw_dir: "data/raw"
+  local_csv:
+    macro: "data/raw/macro.csv"
+    prices: "data/raw/prices.csv"
+    benchmark: "data/raw/benchmark.csv"
+    fundamentals: "data/raw/fundamentals.csv"
+    universe: "data/raw/universe.csv"
+
+macro:
+  rolling_window_months: 12
+  minimum_periods: 6
+
+scoring_weights:
+  w_macro_industry: 0.20
+  w_quality: 0.20
+  w_growth: 0.15
+  w_valuation: 0.15
+  w_momentum: 0.15
+  w_risk: 0.15
+
+factor_processing:
+  winsorize_lower_quantile: 0.05
+  winsorize_upper_quantile: 0.95
+  missing_key_threshold: 3
+
+risk_filters:
+  max_debt_to_assets: 0.75
+  max_debt_to_equity: 3.0
+  max_annualized_volatility: 0.65
+  min_avg_turnover: 5000000
+  exclude_negative_operating_cash_flow: true
+  exclude_st: true
+
+portfolio:
+  rebalance_frequency: "Q"
+  top_n: 20
+  max_single_stock_weight: 0.05
+  max_industry_weight: 0.25
+  min_liquidity: 5000000
+  method: "equal_weight"
+  optional_methods:
+    - "equal_weight"
+    - "score_weight"
+  transaction_cost_bps: 10
+
+backtest:
+  risk_free_rate_annual: 0.02
+  rolling_volatility_window_days: 63

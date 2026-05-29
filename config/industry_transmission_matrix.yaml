@@ -1,0 +1,96 @@
+# Manually editable economic assumptions.
+# Positive sensitivity means the industry is expected to benefit when the macro
+# state variable is positive. These weights are not facts; review them before
+# using the platform for serious research.
+
+industries:
+  Technology:
+    growth: 0.8
+    inflation: -0.2
+    interest_rates: -0.5
+    credit: 0.4
+    liquidity: 0.8
+    commodity_prices: -0.2
+    policy_sensitivity: 0.6
+    risk_appetite: 0.9
+  Healthcare:
+    growth: 0.2
+    inflation: 0.1
+    interest_rates: -0.1
+    credit: 0.1
+    liquidity: 0.2
+    commodity_prices: 0.0
+    policy_sensitivity: 0.4
+    risk_appetite: 0.2
+  Consumer:
+    growth: 0.6
+    inflation: -0.1
+    interest_rates: -0.2
+    credit: 0.2
+    liquidity: 0.3
+    commodity_prices: -0.2
+    policy_sensitivity: 0.1
+    risk_appetite: 0.4
+  Financials:
+    growth: 0.5
+    inflation: 0.2
+    interest_rates: 0.4
+    credit: 0.8
+    liquidity: 0.3
+    commodity_prices: 0.0
+    policy_sensitivity: 0.5
+    risk_appetite: 0.3
+  Industrials:
+    growth: 0.9
+    inflation: -0.1
+    interest_rates: -0.3
+    credit: 0.6
+    liquidity: 0.4
+    commodity_prices: -0.1
+    policy_sensitivity: 0.5
+    risk_appetite: 0.5
+  Materials:
+    growth: 0.7
+    inflation: 0.5
+    interest_rates: -0.2
+    credit: 0.4
+    liquidity: 0.2
+    commodity_prices: 0.8
+    policy_sensitivity: 0.3
+    risk_appetite: 0.4
+  Energy:
+    growth: 0.4
+    inflation: 0.6
+    interest_rates: -0.1
+    credit: 0.2
+    liquidity: 0.1
+    commodity_prices: 0.9
+    policy_sensitivity: 0.4
+    risk_appetite: 0.2
+  Utilities:
+    growth: -0.1
+    inflation: 0.2
+    interest_rates: -0.4
+    credit: 0.1
+    liquidity: 0.2
+    commodity_prices: -0.3
+    policy_sensitivity: 0.6
+    risk_appetite: -0.2
+  Real Estate:
+    growth: 0.5
+    inflation: 0.1
+    interest_rates: -0.8
+    credit: 0.9
+    liquidity: 0.7
+    commodity_prices: -0.2
+    policy_sensitivity: 0.8
+    risk_appetite: 0.4
+  Communication:
+    growth: 0.4
+    inflation: -0.1
+    interest_rates: -0.3
+    credit: 0.2
+    liquidity: 0.5
+    commodity_prices: -0.1
+    policy_sensitivity: 0.4
+    risk_appetite: 0.6
