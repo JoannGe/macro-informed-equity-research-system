@@ -1,46 +1,112 @@
-# Macro-Informed Equity Research Platform
+# Macro-Informed Equity Research Platform V2
 
-This project is an educational investment research system and paper-trading dashboard. It is designed to help study macro-industry-company investment logic for medium- to long-term A-share screening.
+This project is an educational A-share equity research and paper-trading dashboard. It helps study how macro context, industry exposure, and accepted factor-investing concepts can be combined into a transparent stock-screening workflow.
 
 It is not financial advice. It does not connect to broker APIs, place orders, or create automatic trade execution.
 
-## Project Purpose
+## What The System Does
 
-The platform combines:
+V2 builds a factor-based screening model, constructs a long-only paper portfolio, runs a quarterly backtest, and displays the results in Streamlit.
 
-1. Macro regime classification.
-2. Editable industry transmission scoring.
-3. Firm-level fundamental factor scoring.
-4. Risk filtering.
-5. Long-only portfolio construction.
-6. Quarterly backtesting with transaction costs.
-7. Streamlit dashboard.
-8. Deterministic research-note generation.
+The benchmark is configurable and defaults to the ChiNext 50 Index, code `399673`.
 
-The first supported market universe is A-shares. The benchmark is the ChiNext 50 Index, code `399673`.
+## V2 Factor-Investing Basis
 
-## System Architecture
+The default model is inspired by broadly studied factor-investing frameworks. It does not claim that factors guarantee returns.
+
+Supported factor groups:
+
+- Value: earnings yield, book-to-market, and sales yield from PE, PB, and PS.
+- Momentum: 6-month price momentum and 12-month momentum excluding the most recent month when data allows.
+- Quality / profitability: ROE, ROA, gross margin, and operating margin.
+- Investment / asset growth: lower aggressive asset and capex growth is treated as more disciplined by default.
+- Low volatility / risk: realized volatility and recent drawdown.
+- Liquidity: average trading amount, mainly as tradability control.
+- Industry context: editable macro-to-industry transmission matrix.
+- Risk penalty: leverage, volatility, missing data, and cash-flow risk.
+
+Composite score:
 
 ```text
-config/
-  config.yaml                         Main weights, lags, constraints, costs
-  industry_transmission_matrix.yaml   Editable macro-to-industry assumptions
-data/
-  demo/                               Generated tiny synthetic demo data
-  raw/                                Local raw data fallback, ignored by git
-  processed/                          Pipeline outputs, ignored by git
-src/
-  data_fetchers/                      Demo/live/local fallback loaders
-  processing/                         Cleaning and point-in-time alignment
-  factors/                            Macro, industry, firm, and risk factors
-  model/                              Stock scoring and portfolio construction
-  backtest/                           Backtester and performance metrics
-  reports/                            Rule-based research notes
-  dashboard/                          Streamlit app
-  pipeline/                           End-to-end runner
-tests/                                Bias, factor, and portfolio tests
-notebooks/                            Starter research notebooks
+total_score =
+    w_value * value_score
+  + w_momentum * momentum_score
+  + w_quality * quality_score
+  + w_investment * investment_score
+  + w_low_volatility * low_volatility_score
+  + w_liquidity * liquidity_score
+  + w_industry * industry_score
+  - w_risk_penalty * risk_penalty_score
 ```
+
+All weights live in `config/config.yaml`.
+
+## Data Sources
+
+Modes:
+
+- Demo mode: deterministic synthetic data for testing and learning.
+- Live mode: tries free public APIs and falls back safely if allowed.
+
+Live source order:
+
+1. AKShare.
+2. BaoStock.
+3. Demo fallback if `data.allow_demo_fallback: true`.
+
+Optional:
+
+- Tushare Pro is optional and only considered if `TUSHARE_TOKEN` is configured. It is not required for basic V2.
+
+V2 writes standardized internal tables under `data/processed/`:
+
+- `prices.csv`
+- `fundamentals.csv`
+- `industry.csv`
+- `benchmark.csv`
+- `data_status.json`
+
+If free APIs lack a field, the system leaves it missing and creates a warning. It does not invent real financial values.
+
+## How `end_date: "today"` Works
+
+`config/config.yaml` supports:
+
+```yaml
+data:
+  start_date: "2020-01-01"
+  end_date: "today"
+  mode: "live"
+  allow_demo_fallback: true
+```
+
+For live mode, `today` resolves at runtime to the current date. Market data then uses the latest available trading day returned by the API. If today is not a trading day, the dashboard reports the actual latest data date.
+
+For demo mode, the synthetic data remains deterministic for tests.
+
+## Portfolio Construction
+
+The default portfolio construction is intentionally beginner-readable:
+
+1. Start with the stock universe.
+2. Apply data-availability filters.
+3. Apply liquidity filter.
+4. Apply risk filters.
+5. Rank remaining stocks by `total_score`.
+6. Select top N stocks.
+7. Assign initial equal weights by default.
+8. Optionally allow score-weighted weights.
+9. Apply maximum single-stock weight.
+10. Apply maximum industry weight if feasible.
+11. Normalize final weights.
+12. Output diagnostics.
+
+Outputs:
+
+- `selected_portfolio.csv`
+- `portfolio_diagnostics.json`
+
+Each selected stock includes factor scores, initial and final weights, selection reason, and key risk warning.
 
 ## Installation
 
@@ -55,27 +121,17 @@ pip install -r requirements.txt
 
 ## Run Demo Mode
 
-Demo mode does not require API keys. It creates a small synthetic dataset under `data/demo/` and writes processed outputs under `data/processed/`.
-
 ```bash
 python -m src.pipeline.run_all --mode demo
 ```
 
-## Run Live/Research Mode
-
-Live mode is conservative. It looks for local CSV fallbacks first and falls back to demo data if real sources are unavailable. It does not invent missing real observations.
+## Run Live Mode
 
 ```bash
 python -m src.pipeline.run_all --mode live
 ```
 
-Expected optional CSV files are configured in `config/config.yaml`:
-
-- `data/raw/macro.csv`
-- `data/raw/prices.csv`
-- `data/raw/benchmark.csv`
-- `data/raw/fundamentals.csv`
-- `data/raw/universe.csv`
+Live API calls can be unstable in restricted environments. If AKShare and BaoStock fail and demo fallback is enabled, the system logs warnings and writes them to `data/processed/data_status.json`.
 
 ## Run The Dashboard
 
@@ -83,7 +139,16 @@ Expected optional CSV files are configured in `config/config.yaml`:
 streamlit run src/dashboard/app.py
 ```
 
-If processed outputs do not exist, the dashboard sidebar can run the demo pipeline.
+Dashboard pages:
+
+- Overview
+- Factor Model
+- Data Status
+- Stock Ranking
+- Portfolio
+- Backtest
+- Research Notes
+- Methodology & Limitations
 
 ## Run Tests
 
@@ -91,68 +156,37 @@ If processed outputs do not exist, the dashboard sidebar can run the demo pipeli
 pytest
 ```
 
-Tests check that demo mode runs end to end, fundamentals are announced before use, price features use past observations, valuation signs are handled correctly, and portfolio weights respect long-only position and industry constraints.
+Tests cover demo mode, safe live fallback behavior, `end_date = "today"`, standardized schema creation, factor scores, portfolio constraints, diagnostics, data status, and absence of broker/order-execution code.
 
-## API Keys And Environment Variables
+## Environment Variables
 
-Copy `.env.example` to `.env` and add local settings there. Do not commit `.env`.
+Copy `.env.example` to `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-Current live mode is intentionally fallback-first because free data APIs can be unstable. Future connectors can extend `src/data_fetchers/` while preserving the same processed schema.
-
-## Model Summary
-
-Macro regimes are classified using trailing rolling z-scores for growth, inflation, rates, credit, liquidity, commodity, policy, and risk-appetite proxies.
-
-Industry scores use:
+Optional settings:
 
 ```text
-industry_score = macro_regime_vector x industry_sensitivity_vector
+AKSHARE_ENABLED=true
+BAOSTOCK_ENABLED=true
+TUSHARE_TOKEN=
 ```
 
-The matrix is manually editable in `config/industry_transmission_matrix.yaml` because these economic assumptions require human review.
+Never commit `.env`, API keys, tokens, passwords, private data, raw downloaded datasets, or large local caches.
 
-The stock score is:
+## Methodological Limitations
 
-```text
-total_score =
-    w_macro_industry * industry_score
-  + w_quality * quality_score
-  + w_growth * growth_score
-  + w_valuation * valuation_score
-  + w_momentum * momentum_score
-  - w_risk * risk_score
-```
+- Factor returns are not guaranteed.
+- Look-ahead bias can still appear if new data connectors ignore release timing.
+- Survivorship bias can remain if the available universe excludes delisted or removed companies.
+- Overfitting can occur when factor weights are tuned to history.
+- Transaction costs and liquidity constraints are simplified.
+- Free APIs can be delayed, incomplete, unstable, or revised.
+- Missing fundamentals are flagged rather than filled with invented values.
+- Macro regimes and industry transmission assumptions can shift over time.
 
-All weights are stored in `config/config.yaml`.
+## Not Financial Advice
 
-## Data-Source Limitations
-
-Free A-share data sources such as AKShare and BaoStock can change endpoints, rate-limit requests, revise historical data, or have missing fields. This project therefore includes a demo mode and local CSV fallback path.
-
-Demo data is synthetic. It is only for testing the pipeline and dashboard. It is not evidence about real A-share returns, fundamentals, or macro relationships.
-
-Raw financial datasets, cache files, local `.env` files, and large local data files are ignored by git.
-
-## Methodological Risks
-
-- Look-ahead bias: the system uses announcement dates and trailing prices, but every new data connector should be tested.
-- Survivorship bias: a current-index universe may exclude delisted or removed companies.
-- Overfitting: factor weights and industry assumptions can be tuned too closely to history.
-- Transaction costs: default cost is 10 basis points per trade, but real costs vary by market conditions and account type.
-- Missing data: the system flags missing key fields and does not silently fill important fundamentals with arbitrary values.
-- API instability: free data APIs may fail or change schemas.
-- Regime shifts: historical macro-industry relationships may stop working.
-
-## Future Improvements
-
-- Add robust AKShare and BaoStock live connectors with schema validation.
-- Add CSI 300 or CSI 800 constituent history with survivorship-bias controls.
-- Add richer China macro data sources and explicit release calendars.
-- Add company filing availability calendars.
-- Add portfolio cash handling when too few stocks pass constraints.
-- Add factor attribution and scenario analysis.
-- Add more notebook examples for data quality and factor diagnostics.
+This is a research and education system only. It is not an order-execution system, does not connect to brokers, and should not be used as automatic trading advice.

@@ -14,6 +14,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from src.utils.date_utils import requested_date_range
 from src.utils.io_utils import demo_path, read_dataframe, write_dataframe
 
 
@@ -75,8 +76,7 @@ def build_demo_data(config: dict[str, Any]) -> dict[str, pd.DataFrame]:
 
     seed = int(config.get("data", {}).get("demo_seed", 42))
     rng = np.random.default_rng(seed)
-    start_date = pd.Timestamp(config.get("data", {}).get("start_date", "2020-01-01"))
-    end_date = pd.Timestamp(config.get("data", {}).get("end_date", "2025-12-31"))
+    start_date, end_date, _ = requested_date_range(config, mode="demo")
     reporting_lag_days = int(config.get("data", {}).get("reporting_lag_days", 75))
 
     industries = [
@@ -113,6 +113,7 @@ def _build_universe(industries: list[str]) -> pd.DataFrame:
         rows.append(
             {
                 "stock_code": code,
+                "ticker": code,
                 "stock_name": f"Demo {industry[:4]} {idx + 1:02d}",
                 "industry": industry,
                 "is_st": idx in {7, 23},
@@ -196,10 +197,13 @@ def _build_fundamentals(
             rows.append(
                 {
                     "stock_code": company["stock_code"],
+                    "ticker": company["stock_code"],
+                    "date": report_date,
                     "report_date": report_date,
                     "announcement_date": report_date + pd.Timedelta(days=reporting_lag_days),
                     "revenue": revenue,
                     "net_profit": net_profit,
+                    "profit_growth": np.nan,
                     "operating_cash_flow": operating_cash_flow,
                     "total_assets": total_assets,
                     "total_equity": total_equity,
@@ -220,6 +224,9 @@ def _build_fundamentals(
     fundamentals = pd.DataFrame(rows)
     for column in ["pe", "pb", "ps"]:
         fundamentals.loc[rng.choice(fundamentals.index, size=8, replace=False), column] = np.nan
+    fundamentals["profit_growth"] = fundamentals.groupby("stock_code")["net_profit"].pct_change(4)
+    fundamentals["asset_growth"] = fundamentals.groupby("stock_code")["total_assets"].pct_change(4)
+    fundamentals["capex_growth"] = fundamentals.groupby("stock_code")["capex"].pct_change(4)
     return fundamentals
 
 
@@ -262,14 +269,34 @@ def _build_prices(
         volume = base_volume * (1 + rng.normal(0, 0.25, len(dates)))
         volume = np.maximum(volume, 50_000)
         turnover = volume * close
-        for date, stock_close, stock_volume, stock_turnover in zip(dates, close, volume, turnover, strict=True):
+        open_price = close * (1 + rng.normal(0, 0.004, len(dates)))
+        high = np.maximum(open_price, close) * (1 + np.abs(rng.normal(0, 0.006, len(dates))))
+        low = np.minimum(open_price, close) * (1 - np.abs(rng.normal(0, 0.006, len(dates))))
+        for date, stock_open, stock_high, stock_low, stock_close, stock_volume, stock_turnover, stock_return in zip(
+            dates,
+            open_price,
+            high,
+            low,
+            close,
+            volume,
+            turnover,
+            daily_returns,
+            strict=True,
+        ):
             price_rows.append(
                 {
                     "date": date,
                     "stock_code": company["stock_code"],
+                    "ticker": company["stock_code"],
+                    "open": stock_open,
+                    "high": stock_high,
+                    "low": stock_low,
                     "close": stock_close,
                     "volume": stock_volume,
                     "turnover": stock_turnover,
+                    "amount": stock_turnover,
+                    "return": stock_return,
                 }
             )
+    benchmark["return"] = benchmark["close"].pct_change()
     return pd.DataFrame(price_rows), benchmark

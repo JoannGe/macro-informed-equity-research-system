@@ -43,7 +43,9 @@ def run_backtest(
     for idx, rebalance_date in enumerate(rebalance_dates):
         next_rebalance = rebalance_dates[idx + 1] if idx + 1 < len(rebalance_dates) else price_returns["date"].max()
         holdings = portfolio[portfolio["as_of_date"].eq(rebalance_date)].copy()
-        weights = holdings.set_index("stock_code")["weight"].astype(float)
+        code_column = "ticker" if "ticker" in holdings.columns else "stock_code"
+        weight_column = "final_weight" if "final_weight" in holdings.columns else "weight"
+        weights = holdings.set_index(code_column)[weight_column].astype(float)
         turnover = _calculate_turnover(previous_weights, weights)
         turnover_rows.append({"as_of_date": rebalance_date, "turnover": turnover})
 
@@ -53,8 +55,8 @@ def run_backtest(
         if interval.empty:
             previous_weights = weights
             continue
-        interval_returns = interval[interval["stock_code"].isin(weights.index)].copy()
-        interval_returns["weight"] = interval_returns["stock_code"].map(weights)
+        interval_returns = interval[interval["ticker"].isin(weights.index)].copy()
+        interval_returns["weight"] = interval_returns["ticker"].map(weights)
         portfolio_daily = (
             interval_returns.assign(weighted_return=interval_returns["daily_return"] * interval_returns["weight"])
             .groupby("date", as_index=False)["weighted_return"]
@@ -92,8 +94,8 @@ def run_backtest(
 
 def _build_stock_returns(prices: pd.DataFrame) -> pd.DataFrame:
     cleaned = clean_prices(prices)
-    cleaned["daily_return"] = cleaned.groupby("stock_code")["close"].pct_change()
-    return cleaned.dropna(subset=["daily_return"])[["date", "stock_code", "daily_return"]]
+    cleaned["daily_return"] = cleaned.groupby("ticker")["close"].pct_change()
+    return cleaned.dropna(subset=["daily_return"])[["date", "ticker", "daily_return"]]
 
 
 def _build_benchmark_returns(benchmark: pd.DataFrame) -> pd.DataFrame:
